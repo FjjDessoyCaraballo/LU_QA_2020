@@ -1,0 +1,108 @@
+---
+title: "Homework 2"
+author: "Felipe Dessoy Caraballo"
+date: "02/05/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Question 1A
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+rawData <- read.csv("https://raw.githubusercontent.com/FjjDessoyCaraballo/LU_QA_2020/master/Datasets/Corona_mergedV-Dem.csv")
+
+library(ggplot2)
+library(GGally)
+
+ggplot(rawData, aes(x=cases_log))+
+  geom_density(col='grey')
+
+ggplot(rawData, aes(x=v2x_polyarchy))+
+  geom_density(col='black')
+
+ggplot(rawData, aes(x=v2x_libdem))+
+  geom_density(col='blue')
+
+ggplot(rawData, aes(x=v2x_partipdem))+
+  geom_density(col='red')
+```
+
+Question 1B
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+
+rawData$polyarchy_cat=ifelse(rawData$v2x_polyarchy> .5, "Democracy", "Autocracy")
+rawData$polyarchy_cat<-factor(rawData$polyarchy_cat)
+ggpairs(rawData, columns = c("popdata2018_log", "deaths_log", "v2x_partipdem", "polyarchy_cat"))
+
+```
+
+Question 1C
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+#Polyarchy
+
+rawData$polyarchy_cat=ifelse(rawData$v2x_polyarchy> .5, "Democracy", "Autocracy")
+rawData$polyarchy_cat<-factor(rawData$polyarchy_cat)
+boxplot(rawData$cases_log~rawData$polyarchy_cat, 
+        col='yellow', xlab='Type of Democracy', 
+        ylab='Number of Cases')
+
+#Liberal Democracy
+
+rawData$libdem_cat=ifelse(rawData$v2x_libdem > .5, "Democracy", "Autocracy")
+rawData$libdem_cat<-factor(rawData$libdem_cat)
+boxplot(rawData$cases_log~rawData$libdem_cat,
+        col='blue',
+        xlab='Type of Democracy', ylab='Number of Cases')
+
+#Participatory Democracy
+
+rawData$v2x_partipdem_cat=ifelse(rawData$v2x_partipdem > .5, "Democracy", "Autocracy")
+rawData$v2x_partipdem_cat<-factor(rawData$v2x_partipdem_cat)
+boxplot(rawData$cases_log~rawData$v2x_partipdem_cat,
+        col='pink',
+        xlab='Type of Democracy', ylab='Number of Cases')
+
+```
+
+Question 1D
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+
+#Question 1D1
+
+OLS_m1=lm(cases_log~v2x_polyarchy, data=rawData)
+summary(OLS_m1)
+
+#Question 1D2
+
+OLS_m2=lm(cases_log~v2x_libdem, data=rawData)
+summary(OLS_m2)
+
+#Question 1D3
+
+OLS_m3=lm(cases_log~v2x_partipdem, data=rawData)
+summary(OLS_m3)
+
+#Question 1D4
+
+OLS_m4=lm(cases_log~v2x_polyarchy+v2x_libdem+v2x_partipdem, data=rawData)
+summary(OLS_m4)
+
+OLS_m5=lm(cases_log~v2x_polyarchy+popdata2018, data=rawData)
+summary(OLS_m5)
+
+rawData$norm_case=rawData$cases_log/rawData$popdata2018_log
+
+OLS_m6=lm(norm_case~v2x_polyarchy, data=rawData)
+summary(OLS_m6)
+
+#Question 1D5
+
+OLS_m7=lm(norm_case~v2x_polyarchy+popdata2018, data=rawData)
+summary(OLS_m7)
+
+plot(rawData$v2x_polyarchy+rawData$popdata2018,rawData$norm_case, data=rawData, xlab="Norm Cases", ylab="Polyarchy and Population")
+abline(lm(rawData$norm_case~rawData$v2x_polyarchy+rawData$popdata2018, data = rawData), col = "blue")
+```
