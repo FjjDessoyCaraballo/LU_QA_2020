@@ -1,0 +1,204 @@
+---
+title: "Final Project"
+author: "Felipe Dessoy Caraballo"
+date: "26/05/2020"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+Introduction
+
+My focus here is to replicate the results of the paper "The electoral cycle effect in parliamentary democracies", a study made by Stefan Müller and Tom Louwerse. The authors paper questions if there is a government party support straight forward decline for party support throughout electoral cycles, or it has a more "u-shaped" effect that is being influenced by the electoral cycles. The number of observations is over 25,000 (N = 25,328) opinion polls through 171 electoral cycles from 1955 to 2017. The main dependent variable is the poll change, and the independent variables are electoral cycle¹, electoral cycle², electoral cycle³, GDP change (lagged) and the election years.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(lme4)
+library(car)
+library(pastecs)
+library(stargazer)
+library(ggthemes)
+library(sjPlot)
+library(GGally)
+
+#As the dataset is way too large to source it directly from GitHub, you need to download it and manually call it.
+
+dta <- readRDS("C:\\Users\\F. Dessoy Caraballo\\Desktop\\Leiden\\Block IV\\Methods\\R\\replication\\data.rds")
+
+dta_all <- dta %>%
+  dplyr::filter(total_length >= 182.2) %>%
+  dplyr::filter(electoral_cycle_cabinet > 0, electoral_cycle_max < 1.2) %>%
+  dplyr::filter(election == "Legislative") %>%
+  dplyr::filter(system != "Presidential") %>% 
+  mutate(country = as.factor(country),
+         country_code = as.factor(country_code),
+         election_id = as.factor(election_id),
+         poll_id = as.factor(poll_id)) %>% 
+  mutate(partyid = as.factor(paste(country, partyid, sep = "_")))
+
+dta_gov <- dta_all %>%
+  dplyr::filter(government == 1 & electoral_cycle_cabinet > 0)
+
+dta_gov_base <- dta_gov %>% 
+  filter(!is.na(poll_change) & !is.na(electoral_cycle_cabinet)
+         & !is.na(gdp_change_lag) & !is.na(vote_share_last) & !is.na(elecyear))
+
+reg_base <- lmer(poll_change ~ 
+                   poly(electoral_cycle_cabinet, 3)  + 
+                   gdp_change_lag +
+                   vote_share_last + 
+                   I(elecyear - 1986) + 
+                   (1 | country) +  
+                   (1 |  country: partyid) + 
+                   (1 | election_id : partyid), data = dta_gov_base)
+
+dta_gov_base <- dta_gov %>% 
+  filter(!is.na(poll_change) & !is.na(electoral_cycle_cabinet)
+         & !is.na(gdp_change_lag) & !is.na(vote_share_last) & !is.na(elecyear)) %>% 
+  group_by(country, election_id, partyid) %>%
+  arrange(country, election_id, partyid, polldate)
+
+dta_gov_base_lag <- dta_gov_base %>% 
+  filter(!is.na(poll_change_lag))
+
+dta_gov_base_combined <- dta_gov_base %>% 
+  filter(!is.na(diss_pm) & !is.na(single_party_cabinet))
+
+
+reg1=lm(poll_change_percentage_av~electoral_cycle_cabinet+electoral_cycle_max+electoral_cycle_planned+
+              gdp_change_lag+elecyear+vote_share_last, data=dta_gov_base_combined)
+```
+
+Methodology
+
+For such replication, the data has been filtered to parliamentary and semi-presidential systems using a dummy variable. The data has also been filtered to consider only government parties and missed values were disconsidered to make it possible to test for BLUE assumptions. Moreover, the following plots are all inside the filtered parameters. A worthy note here is that the study uses non-linear regressions, but both will be used here to hold the evidence of the authors.
+
+The election cycle variables are expected to have an 'u-shaped' fashion near to the far right end of the electoral cycle axis after a steady downfall, while Gross Domestic Product (GDP) variable relies on the results of GDP near to end of the electoral cycle. As for election years, it is expected to follow the trend of the electoral cycles and also have a downward trend, while vote share has a positive effect on the polls later on.
+
+Replication
+
+Figure 1 shows how the interaction of polls in the electoral cycles, for such, we only used one of the independent variables (electoral cycle¹) and the dependent variable of poll change. Here it is possible to see that that the poll change through electoral cycles shows a downward trend, but as we are using a linear model, we can't see the "u-shaped" pattern. However, figure 2 shows the plot followed the expectated outcome of the "u-shaped" behavior.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=electoral_cycle_cabinet,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 1 - Poll change vs. electoral cycle¹")+
+  labs(y="Poll change", x="electoral cycle¹")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12),
+        plot.title=element_text(size=12))
+
+ggplot(data = dta_gov_base_combined, aes(x = electoral_cycle_cabinet, y = poll_change_percentage_av)) +
+  geom_smooth(method = "loess", se = TRUE, colour = "black") +
+  geom_hline(yintercept = 0, linetype = 2, colour = "black") +
+  ggtitle("Figure 2 - Poll change through electoral cycle¹")+
+  xlab("Electoral Cycle") +
+  ylab("Change in Party Support")
+```
+
+As previously mentioned, this replication is using linear models while the authors are using non-linear modules, so we don't see exactly the 'u-shape'. However, even using a non-linear model it is expected that the model presents a downfard fashion, because the electoral cycle² variable considers the maximum values of each electoral cycle, which means that this plot will show extended cycles and reinforcing the downward fashion. Notwithstanding, it is still possible to see an 'u-shaped' pattern that is previously shown in figure 2 in the intervals of the electoral cycle between 0,6 and 0,9.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=electoral_cycle_max,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 3 - Poll Change vs. electoral cycle²")+
+  labs(y="Poll Change", x="electoral cycle²")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12),
+        plot.title=element_text(size=12))
+
+ggplot(data = dta_gov_base_combined, aes(x = electoral_cycle_max, y = poll_change_percentage_av)) +
+  geom_smooth(method = "loess", se = TRUE, colour = "black") +
+  geom_hline(yintercept = 0, linetype = 2, colour = "black") +
+  ggtitle("Figure 4 - Poll change through electoral cycle²")+
+  xlab("Electoral Cycle") +
+  ylab("Change in Party Support")
+```
+
+Furthermore, figure 6 shows a linear decrease fashion between the polls change and the electoral cycle³. On the other hand, the non-linear model (figure 7) presents the 'u-shaped' trend yet again. Although, the electoral cycle³ variable may have the same electoral cycle length from electoral cycle², the former now has 'planned' length, that considers the maximum number of years of a legislative period and plans for elections accordingly. 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=electoral_cycle_planned,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 5 - Poll change vs. electoral cycle³")+
+  labs(y="Poll change", x="electoral cycle³")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12),
+        plot.title=element_text(size=12))
+
+ggplot(data = dta_gov_base_combined, aes(x = electoral_cycle_planned, y = poll_change_percentage_av)) +
+  geom_smooth(method = "loess", se=TRUE, colour = "black") +
+  geom_hline(yintercept = 0, linetype = 2, colour = "black") +
+  ggtitle("Figure 6 - Poll change through electoral cycle³")+
+  xlab("Electoral Cycle") +
+  ylab("Change in Party Support")
+```
+
+In particular, plotting for poll change and GDP, there is a positive effect in poll changes with positive results in GDP. Subsequently, in figure 8 the mean and poll outcome has a slight better outcome for those government parties that have seen GDP growth through the electoral cycles. The authors argument is that electors reward parties with a positive GDP change next to elections. However, as we are only considering the GDP effect on polls outcome, we can only see the slight change, but it poses as a positive effect on the polls nonetheless.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=gdp_change_lag,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 7 - Poll change vs. GDP change")+
+  labs(y="Poll change", x="GDP change")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12),
+        plot.title=element_text(size=12))
+
+dta_gov_base_combined$gdp_cat=ifelse(dta_gov_base_combined$gdp_change_lag > 0.1, "Increase in GDP", "Decrease in GDP")
+dta_gov_base_combined$gdp_cat<-factor(dta_gov_base_combined$gdp_cat)
+boxplot(dta_gov_base_combined$poll_change_percentage_av~dta_gov_base_combined$gdp_cat,
+        main="Figure 8 - GDP and Poll outcome",
+        col='pink',
+        xlab='GDP', ylab='Polls outcome')
+```
+
+As previously stated, election years have a negative effect on the poll change. This is an expected outcome considering parties popularity through the election cycles as they tend to loose that same popularity after bein a government party. 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=elecyear,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 9 - Poll change vs. election years")+
+  labs(y="Poll change", x="election years")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12,face="bold"),
+        plot.title=element_text(size=12,face="bold"))
+```
+
+Yet, another variable that is a double-edged sword is the vote share in the last election, or the support of the party in the latest election. In the linear model, this support has a positive effect, decreasing the negative outcome from the polls. However, to see it more clearly, figure 11 was plotted considering at least 30% of vote share, which is a considerable share in a parliamentary system, and the mean poll outcome is higher than parties that had less than 30% of the vote share.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(dta_gov_base_combined, aes(x=vote_share_last,y=poll_change_percentage_av))+
+  geom_point(size=.1)+
+  geom_smooth(method = "lm", fill="navy", colour="red")+
+  ggtitle("Figure 10 - Poll change and Party support at last election")+
+  labs(y="Poll change", x="Party support at last election")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=12),
+        plot.title=element_text(size=12))
+
+dta_gov_base_combined$vote_share_cat=ifelse(dta_gov_base_combined$vote_share_last > 30, "High party support", "Low party support")
+dta_gov_base_combined$vote_share_cat<-factor(dta_gov_base_combined$vote_share_cat)
+boxplot(dta_gov_base_combined$poll_change_percentage_av~dta_gov_base_combined$vote_share_cat,
+        main="Figure 11 - Vote share and Poll outcome",
+        col='pink',
+        xlab='Vote share', ylab='Polls outcome')
+```
+
+Finally, table 1 shows that all variables considered in Stefan Müller and Tom Louwerse study have statistical significance and their model holds a strong explanatory power for the electoral effect as an independent variable. The BLUE assumptions are almost all satisfied except for the normal Q-Q, which we can see that the residuals curve off in the extrmities. This can be explained by the high number of observations, and in the range of those observations there are more extreme values than expected from a normal distribution.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+stargazer(reg1,type="text")
+par(mfrow=c(2,2))
+plot(reg1)
+```
+
+Conclusion
+
+In conclusion, the work of Müller and Louwerse have solid results in the effect of the electoral cycle in poll changes. The combination of the independent variables in the basic model delimits the influences of a straight downward change in opinion polls, showing that the government party does not follow this fashion, but instead face a slight 'u-shaped' turn in the polls at the end of the last cycle.  
